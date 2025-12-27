@@ -2,335 +2,160 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Physics Engine Room</title>
+<title>decimalEngine – Real Mobile Gravity</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 
 <style>
+  body { margin: 0; background: black; overflow: hidden; }
   canvas {
     background: white;
-    touch-action: none; /* IMPORTANT for mobile dragging */
+    display: block;
+    touch-action: none;
   }
 </style>
 </head>
 
-<body class="bg-black overflow-hidden text-5xl">
+<body>
 
-<!-- TOOLS -->
-<div
-  class="
-    fixed
-    bottom-3 left-3 right-3
-    md:top-4 md:left-4 md:right-auto md:bottom-auto
-    md:w-72
-    bg-black text-white
-    rounded-2xl shadow-xl
-    p-4 md:p-5
-    space-y-4
-    z-10
-  "
->
-  <!-- TITLE -->
-  <h1 class="text-xl md:text-lg font-bold text-center tracking-wide">
+<!-- CONTROLS -->
+<div class="fixed bottom-3 left-3 right-3 md:top-4 md:left-4 md:right-auto md:w-72 bg-black text-white rounded-2xl p-4 space-y-3 z-10">
+  <h1 class="text-center font-bold">
     decimal<span class="opacity-70">Engine</span>
   </h1>
 
-  <!-- MODE -->
-  <div>
-    <label class="text-sm md:text-xs opacity-70">Mode</label>
-    <select
-      id="mode"
-      class="
-        w-full
-        bg-white text-black
-        rounded-lg
-        px-4 py-3 md:px-3 md:py-2
-        text-base md:text-sm
-      "
-    >
-      <option value="ball">Place Ball</option>
-      <option value="throw">Throw Ball</option>
-      <option value="block">Place Block</option>
-    </select>
-  </div>
+  <select id="mode" class="w-full bg-white text-black rounded px-3 py-2">
+    <option value="ball">Place Ball</option>
+    <option value="throw">Throw Ball</option>
+  </select>
 
-  <!-- ROOM ANGLE -->
-  <div>
-    <label class="text-sm md:text-xs opacity-70">Room Angle (°)</label>
-    <input
-      id="roomAngle"
-      type="range"
-      min="-45"
-      max="45"
-      value="0"
-      class="w-full h-3 md:h-2"
-    >
-  </div>
-
-  <!-- BLOCK ANGLE -->
-  <div>
-    <label class="text-sm md:text-xs opacity-70">Block Angle (°)</label>
-    <input
-      id="blockAngle"
-      type="range"
-      min="-90"
-      max="90"
-      value="0"
-      class="w-full h-3 md:h-2"
-    >
-  </div>
-
-  <!-- CLEAR -->
-  <button
-    id="clear"
-    class="
-      w-full
-      bg-white text-black
-      rounded-xl
-      py-3 md:py-2
-      font-semibold
-      text-base md:text-sm
-      active:scale-95
-      transition
-    "
-  >
-    Clear Scene
+  <button id="clear" class="w-full bg-white text-black rounded py-2 font-semibold">
+    Clear
   </button>
-</div>
 
+  <p class="text-xs opacity-60 text-center">
+    Tap once to enable motion 📱
+  </p>
+</div>
 
 <canvas id="canvas"></canvas>
 
 <script>
-/* =====================
-   DEVICE DETECTION
-===================== */
-const isMobile = window.innerWidth < 768;
-
-/* =====================
+/* ======================
    CANVAS
-===================== */
+====================== */
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
 function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
 }
 resize();
-window.addEventListener("resize", resize);
+addEventListener("resize", resize);
 
-/* =====================
-   UI
-===================== */
-const mode = document.getElementById("mode");
-const roomAngleInput = document.getElementById("roomAngle");
-const blockAngleInput = document.getElementById("blockAngle");
-const clearBtn = document.getElementById("clear");
-
-/* =====================
+/* ======================
    WORLD
-===================== */
+====================== */
 const balls = [];
-const blocks = [];
+const restitution = 0.6;
+const friction = 0.999;
 
-const gravity = 0.6;
-const restitution = 0.7;
-const friction = 0.98;
+/* REAL GRAVITY VECTOR */
+let gX = 0;
+let gY = 0.8;
 
-let roomAngle = 0;
+/* ======================
+   DEVICE MOTION (REAL)
+====================== */
+let motionEnabled = false;
 
-/* Bigger world on mobile */
-const room = {
-  w: isMobile ? 320 : 700,
-  h: isMobile ? 520 : 400,
-  x: () => canvas.width / 2,
-  y: () => canvas.height / 2
-};
+function enableMotion() {
+  if (motionEnabled) return;
 
-let mouse = { down:false, sx:0, sy:0, x:0, y:0 };
-
-/* =====================
-   MATH
-===================== */
-function rotate(x, y, a) {
-  return {
-    x: x * Math.cos(a) - y * Math.sin(a),
-    y: x * Math.sin(a) + y * Math.cos(a)
-  };
+  if (
+    typeof DeviceMotionEvent !== "undefined" &&
+    typeof DeviceMotionEvent.requestPermission === "function"
+  ) {
+    DeviceMotionEvent.requestPermission().then(res => {
+      if (res === "granted") {
+        addEventListener("devicemotion", handleMotion);
+        motionEnabled = true;
+      }
+    });
+  } else {
+    addEventListener("devicemotion", handleMotion);
+    motionEnabled = true;
+  }
 }
 
-/* =====================
-   OBJECT CREATION
-===================== */
+function handleMotion(e) {
+  if (!e.accelerationIncludingGravity) return;
+
+  const ax = e.accelerationIncludingGravity.x;
+  const ay = e.accelerationIncludingGravity.y;
+
+  /* SCALE + AXIS FIX */
+  gX = ax * 0.12;
+  gY = ay * 0.12;
+}
+
+/* ======================
+   OBJECTS
+====================== */
 function addBall(x, y, vx=0, vy=0) {
   balls.push({
     x, y,
     vx, vy,
-    r: isMobile ? 14 : 10
+    r: 12
   });
 }
 
-function addBlock(x, y, angle) {
-  blocks.push({
-    x, y,
-    w: isMobile ? 180 : 140,
-    h: isMobile ? 26 : 18,
-    angle
-  });
-}
-
-/* =====================
-   ROOM COLLISION
-===================== */
-function resolveRoom(ball) {
-  const dx = ball.x - room.x();
-  const dy = ball.y - room.y();
-  let local = rotate(dx, dy, -roomAngle);
-
-  const hw = room.w / 2;
-  const hh = room.h / 2;
-
-  let nx = 0, ny = 0;
-
-  if (local.x - ball.r < -hw) { local.x = -hw + ball.r; nx = 1; }
-  if (local.x + ball.r > hw)  { local.x = hw - ball.r;  nx = -1; }
-  if (local.y - ball.r < -hh) { local.y = -hh + ball.r; ny = 1; }
-  if (local.y + ball.r > hh)  { local.y = hh - ball.r;  ny = -1; }
-
-  if (nx || ny) {
-    const worldNormal = rotate(nx, ny, roomAngle);
-    const vDotN = ball.vx * worldNormal.x + ball.vy * worldNormal.y;
-    ball.vx -= (1 + restitution) * vDotN * worldNormal.x;
-    ball.vy -= (1 + restitution) * vDotN * worldNormal.y;
-    ball.vx *= friction;
+/* ======================
+   COLLISION
+====================== */
+function resolveWalls(b) {
+  if (b.x - b.r < 0) {
+    b.x = b.r;
+    b.vx *= -restitution;
   }
-
-  const world = rotate(local.x, local.y, roomAngle);
-  ball.x = room.x() + world.x;
-  ball.y = room.y() + world.y;
-}
-
-/* =====================
-   BLOCK COLLISION
-===================== */
-function resolveBlock(ball, block) {
-  const cos = Math.cos(block.angle);
-  const sin = Math.sin(block.angle);
-
-  const dx = ball.x - block.x;
-  const dy = ball.y - block.y;
-
-  const lx = dx * cos + dy * sin;
-  const ly = -dx * sin + dy * cos;
-
-  const hw = block.w / 2;
-  const hh = block.h / 2;
-
-  const cx = Math.max(-hw, Math.min(hw, lx));
-  const cy = Math.max(-hh, Math.min(hh, ly));
-
-  const dx2 = lx - cx;
-  const dy2 = ly - cy;
-
-  if (dx2*dx2 + dy2*dy2 < ball.r*ball.r) {
-    const dist = Math.hypot(dx2, dy2) || 1;
-    const nx = dx2 / dist;
-    const ny = dy2 / dist;
-
-    const worldNormal = {
-      x: nx * cos - ny * sin,
-      y: nx * sin + ny * cos
-    };
-
-    ball.x += worldNormal.x * (ball.r - dist);
-    ball.y += worldNormal.y * (ball.r - dist);
-
-    const vDotN = ball.vx * worldNormal.x + ball.vy * worldNormal.y;
-    ball.vx -= (1 + restitution) * vDotN * worldNormal.x;
-    ball.vy -= (1 + restitution) * vDotN * worldNormal.y;
-    ball.vx *= friction;
+  if (b.x + b.r > canvas.width) {
+    b.x = canvas.width - b.r;
+    b.vx *= -restitution;
+  }
+  if (b.y - b.r < 0) {
+    b.y = b.r;
+    b.vy *= -restitution;
+  }
+  if (b.y + b.r > canvas.height) {
+    b.y = canvas.height - b.r;
+    b.vy *= -restitution;
   }
 }
 
-/* =====================
-   BALL–BALL (POOL)
-===================== */
-function resolveBallBall(a, b) {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const dist = Math.hypot(dx, dy);
-  const minDist = a.r + b.r;
-  if (dist >= minDist || dist === 0) return;
-
-  const nx = dx / dist;
-  const ny = dy / dist;
-
-  const overlap = minDist - dist;
-  a.x -= nx * overlap * 0.5;
-  a.y -= ny * overlap * 0.5;
-  b.x += nx * overlap * 0.5;
-  b.y += ny * overlap * 0.5;
-
-  const rvx = b.vx - a.vx;
-  const rvy = b.vy - a.vy;
-  const vel = rvx * nx + rvy * ny;
-  if (vel > 0) return;
-
-  const impulse = -(1 + 0.95) * vel / 2;
-  const ix = impulse * nx;
-  const iy = impulse * ny;
-
-  a.vx -= ix; a.vy -= iy;
-  b.vx += ix; b.vy += iy;
-}
-
-/* =====================
+/* ======================
    UPDATE
-===================== */
+====================== */
 function update() {
   balls.forEach(b => {
-    b.vy += gravity;
+    b.vx += gX;
+    b.vy += gY;
+
     b.x += b.vx;
     b.y += b.vy;
 
-    resolveRoom(b);
-    blocks.forEach(bl => resolveBlock(b, bl));
+    b.vx *= friction;
+    b.vy *= friction;
+
+    resolveWalls(b);
   });
-
-  for (let i = 0; i < balls.length; i++) {
-    for (let j = i + 1; j < balls.length; j++) {
-      resolveBallBall(balls[i], balls[j]);
-    }
-  }
 }
 
-/* =====================
+/* ======================
    DRAW
-===================== */
-function drawRoom() {
-  ctx.save();
-  ctx.translate(room.x(), room.y());
-  ctx.rotate(roomAngle);
-  ctx.strokeStyle = "#000";
-  ctx.lineWidth = isMobile ? 4 : 3;
-  ctx.strokeRect(-room.w/2, -room.h/2, room.w, room.h);
-  ctx.restore();
-}
-
+====================== */
 function draw() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  drawRoom();
-
-  blocks.forEach(b => {
-    ctx.save();
-    ctx.translate(b.x, b.y);
-    ctx.rotate(b.angle);
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-b.w/2, -b.h/2, b.w, b.h);
-    ctx.restore();
-  });
 
   balls.forEach(b => {
     ctx.beginPath();
@@ -338,20 +163,11 @@ function draw() {
     ctx.fillStyle = "#000";
     ctx.fill();
   });
-
-  if (mouse.down && mode.value === "throw") {
-    ctx.beginPath();
-    ctx.moveTo(mouse.sx, mouse.sy);
-    ctx.lineTo(mouse.x, mouse.y);
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-  }
 }
 
-/* =====================
+/* ======================
    LOOP
-===================== */
+====================== */
 function loop() {
   update();
   draw();
@@ -359,53 +175,34 @@ function loop() {
 }
 loop();
 
-/* =====================
-   INPUT (POINTER EVENTS)
-===================== */
-canvas.addEventListener("pointerdown", e => {
-  mouse.down = true;
-  mouse.sx = mouse.x = e.clientX;
-  mouse.sy = mouse.y = e.clientY;
-});
+/* ======================
+   INPUT
+====================== */
+const mode = document.getElementById("mode");
+const clearBtn = document.getElementById("clear");
 
-canvas.addEventListener("pointermove", e => {
-  mouse.x = e.clientX;
-  mouse.y = e.clientY;
+let startX=0, startY=0;
+
+canvas.addEventListener("pointerdown", e => {
+  enableMotion();
+  startX = e.clientX;
+  startY = e.clientY;
 });
 
 canvas.addEventListener("pointerup", e => {
-  mouse.down = false;
-
   if (mode.value === "ball") {
     addBall(e.clientX, e.clientY);
-  }
-
-  if (mode.value === "throw") {
+  } else {
     addBall(
-      mouse.sx,
-      mouse.sy,
-      (mouse.sx - e.clientX) * 0.12,
-      (mouse.sy - e.clientY) * 0.12
-    );
-  }
-
-  if (mode.value === "block") {
-    addBlock(
-      e.clientX,
-      e.clientY,
-      blockAngleInput.value * Math.PI/180
+      startX,
+      startY,
+      (startX - e.clientX) * 0.15,
+      (startY - e.clientY) * 0.15
     );
   }
 });
 
-roomAngleInput.addEventListener("input", () => {
-  roomAngle = roomAngleInput.value * Math.PI / 180;
-});
-
-clearBtn.addEventListener("click", () => {
-  balls.length = 0;
-  blocks.length = 0;
-});
+clearBtn.onclick = () => balls.length = 0;
 </script>
 
 </body>
