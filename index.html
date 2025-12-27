@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>decimalEngine – Real Mobile Gravity</title>
+<title>decimalEngine – Real Mobile Gravity FIXED</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 
@@ -18,7 +18,7 @@
 
 <body>
 
-<!-- CONTROLS -->
+<!-- UI -->
 <div class="fixed bottom-3 left-3 right-3 md:top-4 md:left-4 md:right-auto md:w-72 bg-black text-white rounded-2xl p-4 space-y-3 z-10">
   <h1 class="text-center font-bold">
     decimal<span class="opacity-70">Engine</span>
@@ -55,18 +55,28 @@ resize();
 addEventListener("resize", resize);
 
 /* ======================
+   ROOM
+====================== */
+const room = {
+  w: Math.min(700, innerWidth - 40),
+  h: Math.min(450, innerHeight - 40),
+  x: () => canvas.width / 2,
+  y: () => canvas.height / 2
+};
+
+/* ======================
    WORLD
 ====================== */
 const balls = [];
 const restitution = 0.6;
-const friction = 0.999;
+const friction = 0.995;
 
 /* REAL GRAVITY VECTOR */
 let gX = 0;
 let gY = 0.8;
 
 /* ======================
-   DEVICE MOTION (REAL)
+   DEVICE MOTION
 ====================== */
 let motionEnabled = false;
 
@@ -79,12 +89,12 @@ function enableMotion() {
   ) {
     DeviceMotionEvent.requestPermission().then(res => {
       if (res === "granted") {
-        addEventListener("devicemotion", handleMotion);
+        window.addEventListener("devicemotion", handleMotion);
         motionEnabled = true;
       }
     });
   } else {
-    addEventListener("devicemotion", handleMotion);
+    window.addEventListener("devicemotion", handleMotion);
     motionEnabled = true;
   }
 }
@@ -95,8 +105,8 @@ function handleMotion(e) {
   const ax = e.accelerationIncludingGravity.x;
   const ay = e.accelerationIncludingGravity.y;
 
-  /* SCALE + AXIS FIX */
-  gX = ax * 0.12;
+  /* PORTRAIT MODE FIX */
+  gX = -ax * 0.12;   // ← FIXED inversion
   gY = ay * 0.12;
 }
 
@@ -104,31 +114,35 @@ function handleMotion(e) {
    OBJECTS
 ====================== */
 function addBall(x, y, vx=0, vy=0) {
-  balls.push({
-    x, y,
-    vx, vy,
-    r: 12
-  });
+  balls.push({ x, y, vx, vy, r: 12 });
 }
 
+/* INITIAL BALL */
+addBall(room.x(), room.y());
+
 /* ======================
-   COLLISION
+   COLLISION (ROOM)
 ====================== */
-function resolveWalls(b) {
-  if (b.x - b.r < 0) {
-    b.x = b.r;
+function resolveRoom(b) {
+  const left   = room.x() - room.w/2;
+  const right  = room.x() + room.w/2;
+  const top    = room.y() - room.h/2;
+  const bottom = room.y() + room.h/2;
+
+  if (b.x - b.r < left) {
+    b.x = left + b.r;
     b.vx *= -restitution;
   }
-  if (b.x + b.r > canvas.width) {
-    b.x = canvas.width - b.r;
+  if (b.x + b.r > right) {
+    b.x = right - b.r;
     b.vx *= -restitution;
   }
-  if (b.y - b.r < 0) {
-    b.y = b.r;
+  if (b.y - b.r < top) {
+    b.y = top + b.r;
     b.vy *= -restitution;
   }
-  if (b.y + b.r > canvas.height) {
-    b.y = canvas.height - b.r;
+  if (b.y + b.r > bottom) {
+    b.y = bottom - b.r;
     b.vy *= -restitution;
   }
 }
@@ -147,15 +161,27 @@ function update() {
     b.vx *= friction;
     b.vy *= friction;
 
-    resolveWalls(b);
+    resolveRoom(b);
   });
 }
 
 /* ======================
    DRAW
 ====================== */
+function drawRoom() {
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(
+    room.x() - room.w/2,
+    room.y() - room.h/2,
+    room.w,
+    room.h
+  );
+}
+
 function draw() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawRoom();
 
   balls.forEach(b => {
     ctx.beginPath();
@@ -181,12 +207,12 @@ loop();
 const mode = document.getElementById("mode");
 const clearBtn = document.getElementById("clear");
 
-let startX=0, startY=0;
+let sx=0, sy=0;
 
 canvas.addEventListener("pointerdown", e => {
   enableMotion();
-  startX = e.clientX;
-  startY = e.clientY;
+  sx = e.clientX;
+  sy = e.clientY;
 });
 
 canvas.addEventListener("pointerup", e => {
@@ -194,15 +220,18 @@ canvas.addEventListener("pointerup", e => {
     addBall(e.clientX, e.clientY);
   } else {
     addBall(
-      startX,
-      startY,
-      (startX - e.clientX) * 0.15,
-      (startY - e.clientY) * 0.15
+      sx,
+      sy,
+      (sx - e.clientX) * 0.15,
+      (sy - e.clientY) * 0.15
     );
   }
 });
 
-clearBtn.onclick = () => balls.length = 0;
+clearBtn.onclick = () => {
+  balls.length = 0;
+  addBall(room.x(), room.y());
+};
 </script>
 
 </body>
