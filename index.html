@@ -1,28 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>decimalEngine – Real Mobile Gravity FIXED</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>decimalEngine – Under Maintenance</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 
-<script src="https://cdn.tailwindcss.com"></script>
-
-<style>
-  body { margin: 0; background: black; overflow: hidden; }
-  canvas {
-    background: white;
-    display: block;
-    touch-action: none;
-  }
-</style>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+    }
+  </style>
 </head>
 
-<body class="text-4xl text-white flex justify-center items-center h-screen w-screen">
-  <div class="text-4xl text-white flex justify-center items-center w-full text-center">
-  Sorry!!!!<br>
-  You are late <br>
-  This Site is Under Maintainance
+<body class="h-screen w-screen flex items-center justify-center text-white">
+  <div class="flex flex-col items-center justify-center text-center px-4">
 
-</div>
+    <h1 class="text-4xl sm:text-5xl font-bold mb-4">
+      Sorry!!!!
+    </h1>
 
+    <p class="text-2xl sm:text-3xl mb-2">
+      You are late
+    </p>
+
+    <p class="text-xl sm:text-2xl opacity-80">
+      This site is under maintenance
+    </p>
+
+    <p class="block sm:hidden text-red-400 mt-6 text-lg font-semibold">
+      Don’t open on mobile 🚫📱
+    </p>
+
+    <p class="hidden sm:block text-green-400 mt-6 text-sm opacity-70">
+      Open on desktop for best experience 🖥️
+    </p>
+
+  </div>
 </body>
 </html>
